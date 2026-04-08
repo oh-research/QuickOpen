@@ -54,10 +54,7 @@ struct QuickOpenApp: App {
 
     private var menuBarImage: Image {
         if !coordinator.permissionManager.allPermissionsGranted {
-            return Image(systemName: "exclamationmark.arrow.trianglehead.counterclockwise.rotate.90")
-        }
-        if coordinator.configManager.mappings.allSatisfy({ !$0.isEnabled }) {
-            return Image(systemName: "folder.badge.minus")
+            return Image(systemName: "exclamationmark.circle")
         }
         return Image(nsImage: MenuBarIcon.make())
     }
