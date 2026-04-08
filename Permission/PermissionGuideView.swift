@@ -40,7 +40,7 @@ struct PermissionGuideView: View {
                         granted: coordinator.permissionManager.accessibilityGranted,
                         title: "Accessibility",
                         description: "Required to detect global shortcuts and mouse/trackpad events",
-                        action: { coordinator.permissionManager.requestAccessibility() }
+                        action: { coordinator.permissionManager.openAccessibilitySettings() }
                     )
 
                     Divider()
