@@ -1,4 +1,3 @@
-import AppKit
 import SwiftUI
 
 struct PermissionGuideView: View {
@@ -7,30 +6,9 @@ struct PermissionGuideView: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            // Header
-            VStack(spacing: 12) {
-                Image(nsImage: NSApp.applicationIconImage)
-                    .resizable()
-                    .frame(width: 96, height: 96)
-
-                Text("QuickOpen")
-                    .font(.title)
-                    .fontWeight(.bold)
-
-                Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0.0")")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-
-                Text("Developed by oh-research")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-
-                Link("github.com/oh-research/QuickOpen",
-                     destination: URL(string: "https://github.com/oh-research/QuickOpen")!)
-                    .font(.caption)
-            }
-
-            Divider()
+            Text("How to Use QuickOpen")
+                .font(.title2)
+                .fontWeight(.semibold)
 
             // How to use
             GroupBox("How to use") {
