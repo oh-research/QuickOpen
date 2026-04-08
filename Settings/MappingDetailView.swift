@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct MappingDetailView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(AppCoordinator.self) private var coordinator
     @Environment(\.dismiss) private var dismiss
 
     enum Mode {
@@ -63,11 +63,11 @@ struct MappingDetailView: View {
                 GroupBox("Trigger Configuration") {
                     switch triggerTypeSelection {
                     case 0:
-                        keyboardConfigPanel
+                        KeyboardTriggerConfigView(recordedKeyCombo: $recordedKeyCombo)
                     case 1:
-                        mouseConfigPanel
+                        MouseTriggerConfigView(modifiers: $mouseModifiers, clickType: $clickType)
                     case 2:
-                        trackpadConfigPanel
+                        TrackpadTriggerConfigView(modifiers: $trackpadModifiers, gestureType: $gestureType)
                     default:
                         EmptyView()
                     }
@@ -136,116 +136,6 @@ struct MappingDetailView: View {
         .frame(width: 930, height: 580)
         .onAppear {
             loadFromMode()
-        }
-    }
-
-    // MARK: - Config Panels
-
-    private var keyboardConfigPanel: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Shortcut:")
-                if let combo = recordedKeyCombo {
-                    Text(combo.displayString)
-                        .font(.system(.body, design: .monospaced))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.quaternary)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                } else {
-                    Text("Not set")
-                        .foregroundStyle(.secondary)
-                }
-
-                Button(appState.shortcutService.isRecording ? "Cancel" : "Record Shortcut") {
-                    if appState.shortcutService.isRecording {
-                        appState.shortcutService.stopRecording()
-                    } else {
-                        appState.shortcutService.onShortcutRecorded = { combo in
-                            recordedKeyCombo = combo
-                        }
-                        appState.shortcutService.startRecording()
-                    }
-                }
-            }
-
-            if appState.shortcutService.isRecording {
-                Text("Press a key combination...")
-                    .foregroundStyle(.orange)
-                    .font(.caption)
-            }
-        }
-        .padding(8)
-    }
-
-    private var mouseConfigPanel: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            modifierCheckboxes(modifiers: $mouseModifiers)
-
-            Picker("Click Type:", selection: $clickType) {
-                ForEach(ClickType.allCases, id: \.self) { type in
-                    Text(type.displayName).tag(type)
-                }
-            }
-
-            if mouseModifiers.isEmpty {
-                Label("At least one modifier key is required", systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
-                    .font(.caption)
-            }
-
-            if mouseModifiers == [.command] && clickType == .singleClick {
-                Label("Cmd+Click conflicts with Finder multi-select", systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
-                    .font(.caption)
-            }
-        }
-        .padding(8)
-    }
-
-    private var trackpadConfigPanel: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            modifierCheckboxes(modifiers: $trackpadModifiers)
-
-            Picker("Gesture Type:", selection: $gestureType) {
-                ForEach(TrackpadGestureType.allCases, id: \.self) { type in
-                    Text(type.displayName).tag(type)
-                }
-            }
-
-            if trackpadModifiers.isEmpty {
-                Label("At least one modifier key is required", systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
-                    .font(.caption)
-            }
-
-            if gestureType == .forceClick {
-                Label("Force Click requires a Force Touch trackpad", systemImage: "info.circle")
-                    .foregroundStyle(.blue)
-                    .font(.caption)
-            }
-        }
-        .padding(8)
-    }
-
-    private func modifierCheckboxes(modifiers: Binding<Set<ModifierKey>>) -> some View {
-        HStack(spacing: 16) {
-            Text("Modifier Keys:")
-            ForEach(ModifierKey.allCases) { key in
-                Toggle(isOn: Binding(
-                    get: { modifiers.wrappedValue.contains(key) },
-                    set: { isOn in
-                        if isOn {
-                            modifiers.wrappedValue.insert(key)
-                        } else {
-                            modifiers.wrappedValue.remove(key)
-                        }
-                    }
-                )) {
-                    Text("\(key.symbol) \(key.displayName)")
-                }
-                .toggleStyle(.checkbox)
-            }
         }
     }
 

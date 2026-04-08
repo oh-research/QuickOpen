@@ -1,16 +1,17 @@
+import AppKit
 import SwiftUI
 
 struct PermissionGuideView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(AppCoordinator.self) private var coordinator
     var onGetStarted: () -> Void
 
     var body: some View {
         VStack(spacing: 24) {
             // Header
             VStack(spacing: 12) {
-                Image(systemName: "folder.badge.gearshape")
-                    .font(.system(size: 56))
-                    .foregroundStyle(.blue)
+                Image(nsImage: NSApp.applicationIconImage)
+                    .resizable()
+                    .frame(width: 96, height: 96)
 
                 Text("QuickOpen")
                     .font(.title)
@@ -58,39 +59,39 @@ struct PermissionGuideView: View {
             GroupBox("Permissions") {
                 VStack(spacing: 12) {
                     PermissionRow(
-                        granted: appState.permissionManager.accessibilityGranted,
+                        granted: coordinator.permissionManager.accessibilityGranted,
                         title: "Accessibility",
                         description: "Required to detect global shortcuts and mouse/trackpad events",
-                        action: { appState.permissionManager.requestAccessibility() }
+                        action: { coordinator.permissionManager.requestAccessibility() }
                     )
 
                     Divider()
 
                     PermissionRow(
-                        granted: appState.permissionManager.automationGranted,
+                        granted: coordinator.permissionManager.automationGranted,
                         title: "Automation (Finder)",
                         description: "Required to communicate with Finder to get selected files",
-                        action: { appState.permissionManager.openAutomationSettings() }
+                        action: { coordinator.permissionManager.openAutomationSettings() }
                     )
                 }
                 .padding(.vertical, 4)
             }
 
             // Get Started
-            Button(appState.setupCompleted ? "Close" : "Get Started") {
+            Button(coordinator.state.setupCompleted ? "Close" : "Get Started") {
                 onGetStarted()
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .disabled(!appState.permissionManager.allPermissionsGranted)
+            .disabled(!coordinator.permissionManager.allPermissionsGranted)
         }
         .padding(24)
         .frame(width: 420)
         .onAppear {
-            appState.permissionManager.checkPermissions()
+            coordinator.permissionManager.checkPermissions()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            appState.permissionManager.checkPermissions()
+            coordinator.permissionManager.checkPermissions()
         }
     }
 }

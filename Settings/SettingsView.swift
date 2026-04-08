@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(AppCoordinator.self) private var coordinator
 
     var body: some View {
         TabView {
@@ -16,6 +16,6 @@ struct SettingsView: View {
                 }
         }
         .frame(minWidth: 400, minHeight: 400)
-        .environment(appState)
+        .environment(coordinator)
     }
 }

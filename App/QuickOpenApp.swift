@@ -3,7 +3,7 @@ import SwiftUI
 
 @main
 struct QuickOpenApp: App {
-    @State private var appState = AppState()
+    @State private var coordinator = AppCoordinator()
     @Environment(\.openWindow) private var openWindow
 
     init() {
@@ -20,12 +20,12 @@ struct QuickOpenApp: App {
     var body: some Scene {
         MenuBarExtra {
             MenuBarView()
-                .environment(appState)
+                .environment(coordinator)
         } label: {
-            Image(systemName: menuBarIconName)
+            menuBarImage
                 .onAppear {
-                    if appState.showSetupWindow {
-                        appState.showSetupWindow = false
+                    if coordinator.state.showSetupWindow {
+                        coordinator.state.showSetupWindow = false
                         openWindow(id: "setup")
                         NSApp.activate(ignoringOtherApps: true)
                     }
@@ -34,37 +34,44 @@ struct QuickOpenApp: App {
 
         Settings {
             SettingsView()
-                .environment(appState)
+                .environment(coordinator)
         }
 
         Window("QuickOpen Setup", id: "setup") {
-            SetupWindowContent(appState: appState)
+            SetupWindowContent(coordinator: coordinator)
+        }
+        .windowResizability(.contentSize)
+        .windowStyle(.titleBar)
+        .defaultPosition(.center)
+
+        Window("About QuickOpen", id: "about") {
+            AboutView()
         }
         .windowResizability(.contentSize)
         .windowStyle(.titleBar)
         .defaultPosition(.center)
     }
 
-    private var menuBarIconName: String {
-        if !appState.permissionManager.allPermissionsGranted {
-            return "exclamationmark.arrow.trianglehead.counterclockwise.rotate.90"
+    private var menuBarImage: Image {
+        if !coordinator.permissionManager.allPermissionsGranted {
+            return Image(systemName: "exclamationmark.arrow.trianglehead.counterclockwise.rotate.90")
         }
-        if appState.configManager.mappings.allSatisfy({ !$0.isEnabled }) {
-            return "folder.badge.minus"
+        if coordinator.configManager.mappings.allSatisfy({ !$0.isEnabled }) {
+            return Image(systemName: "folder.badge.minus")
         }
-        return "folder.badge.gearshape"
+        return Image(nsImage: MenuBarIcon.make())
     }
 }
 
 /// Wrapper for the setup / "How to Use" window.
 struct SetupWindowContent: View {
-    let appState: AppState
+    let coordinator: AppCoordinator
 
     var body: some View {
         PermissionGuideView {
-            appState.completeSetup()
+            coordinator.completeSetup()
             NSApp.keyWindow?.close()
         }
-        .environment(appState)
+        .environment(coordinator)
     }
 }

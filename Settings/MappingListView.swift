@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct MappingListView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(AppCoordinator.self) private var coordinator
     @State private var selectedMappingID: UUID?
     @State private var showingAddSheet = false
     @State private var editingMapping: TriggerMapping?
@@ -16,10 +16,10 @@ struct MappingListView: View {
 
             // List
             List(selection: $selectedMappingID) {
-                ForEach(appState.configManager.mappings) { mapping in
+                ForEach(coordinator.configManager.mappings) { mapping in
                     MappingRow(mapping: mapping) {
-                        appState.configManager.toggleMapping(id: mapping.id)
-                        appState.refreshTriggers()
+                        coordinator.configManager.toggleMapping(id: mapping.id)
+                        coordinator.refreshTriggers()
                     }
                     .tag(mapping.id)
                     .onTapGesture(count: 2) {
@@ -41,8 +41,8 @@ struct MappingListView: View {
 
                 Button {
                     if let id = selectedMappingID {
-                        appState.configManager.removeMapping(id: id)
-                        appState.refreshTriggers()
+                        coordinator.configManager.removeMapping(id: id)
+                        coordinator.refreshTriggers()
                         selectedMappingID = nil
                     }
                 } label: {
@@ -56,7 +56,7 @@ struct MappingListView: View {
 
                 Button {
                     if let id = selectedMappingID,
-                       let mapping = appState.configManager.mappings.first(where: { $0.id == id }) {
+                       let mapping = coordinator.configManager.mappings.first(where: { $0.id == id }) {
                         editingMapping = mapping
                     }
                 } label: {
@@ -71,17 +71,17 @@ struct MappingListView: View {
         }
         .sheet(isPresented: $showingAddSheet) {
             MappingDetailView(mode: .add) { newMapping in
-                appState.configManager.addMapping(newMapping)
-                appState.refreshTriggers()
+                coordinator.configManager.addMapping(newMapping)
+                coordinator.refreshTriggers()
             }
-            .environment(appState)
+            .environment(coordinator)
         }
         .sheet(item: $editingMapping) { mapping in
             MappingDetailView(mode: .edit(mapping)) { updatedMapping in
-                appState.configManager.updateMapping(updatedMapping)
-                appState.refreshTriggers()
+                coordinator.configManager.updateMapping(updatedMapping)
+                coordinator.refreshTriggers()
             }
-            .environment(appState)
+            .environment(coordinator)
         }
     }
 }

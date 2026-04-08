@@ -1,12 +1,12 @@
 import SwiftUI
 
 struct GeneralSettingsView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(AppCoordinator.self) private var coordinator
 
     var body: some View {
         Form {
             Section("Startup") {
-                @Bindable var loginManager = appState.loginItemManager
+                @Bindable var loginManager = coordinator.loginItemManager
                 Toggle("Launch at Login", isOn: $loginManager.isEnabled)
             }
 

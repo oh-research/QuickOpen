@@ -2,38 +2,26 @@ import Observation
 import SwiftUI
 import os
 
-/// Central observable state for the QuickOpen app.
+/// Coordinates app-level flow: owns services, sets up triggers,
+/// and reacts to permission state changes at runtime.
 @Observable
 @MainActor
-final class AppState {
-    private static let logger = Logger(subsystem: "com.ohresearch.QuickOpen", category: "AppState")
+final class AppCoordinator {
+    private static let logger = Logger(subsystem: "com.ohresearch.QuickOpen", category: "AppCoordinator")
 
+    let state = AppState()
     let configManager = ConfigManager()
     let permissionManager = PermissionManager()
     let shortcutService = ShortcutService()
     let eventMonitorService = EventMonitorService()
     let loginItemManager = LoginItemManager()
 
-    /// Whether initial setup (permissions) has been completed
-    var setupCompleted: Bool {
-        get {
-            UserDefaults.standard.bool(forKey: "setupCompleted")
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: "setupCompleted")
-        }
-    }
-
-    /// Whether the setup window should be shown
-    var showSetupWindow: Bool = false
-
-    /// Tracks the last known accessibility state so we can react to changes.
     private var lastKnownAccessibility = false
     private var triggersConfigured = false
 
     init() {
-        if !setupCompleted || !permissionManager.allPermissionsGranted {
-            showSetupWindow = true
+        if !state.setupCompleted || !permissionManager.allPermissionsGranted {
+            state.showSetupWindow = true
         } else {
             setupTriggers()
         }
@@ -58,7 +46,7 @@ final class AppState {
         permissionManager.stopPeriodicCheck()
         shortcutService.unregisterAll()
         triggersConfigured = false
-        Self.logger.info("AppState cleanup completed")
+        Self.logger.info("AppCoordinator cleanup completed")
     }
 
     /// Called by the periodic permission check (via observation) to react to
@@ -85,19 +73,30 @@ final class AppState {
     }
 
     func completeSetup() {
-        setupCompleted = true
-        showSetupWindow = false
+        state.setupCompleted = true
+        state.showSetupWindow = false
         setupTriggers()
     }
 
+    func setEnabled(_ enabled: Bool) {
+        state.isEnabled = enabled
+        if enabled {
+            setupTriggers()
+        } else {
+            eventMonitorService.stop()
+            shortcutService.unregisterAll()
+            triggersConfigured = false
+            Self.logger.info("Triggers disabled by user")
+        }
+    }
+
     func setupTriggers() {
+        guard state.isEnabled else { return }
         guard !triggersConfigured else { return }
         triggersConfigured = true
 
-        // Register keyboard shortcuts
         registerAllKeyboardShortcuts()
 
-        // Setup mouse/trackpad event monitor
         eventMonitorService.onTriggerDetected = { [weak self] trigger, completion in
             guard let self else { completion(); return }
             self.handleTrigger(trigger)

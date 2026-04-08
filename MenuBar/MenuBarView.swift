@@ -1,16 +1,28 @@
 import SwiftUI
 
 struct MenuBarView: View {
-    @Environment(AppState.self) private var appState
+    @Environment(AppCoordinator.self) private var coordinator
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
+        Toggle("Enable", isOn: Binding(
+            get: { coordinator.state.isEnabled },
+            set: { coordinator.setEnabled($0) }
+        ))
+
+        Divider()
+
         SettingsLink {
             Text("Settings...")
         }
+        .keyboardShortcut(",")
 
         Button("How to Use...") {
             openWindow(id: "setup")
+        }
+
+        Button("About QuickOpen") {
+            openWindow(id: "about")
         }
 
         Divider()
