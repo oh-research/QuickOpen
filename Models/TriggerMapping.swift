@@ -46,6 +46,14 @@ enum ClickType: String, Codable, CaseIterable {
         case .rightClick: return "Right Click"
         }
     }
+
+    var chipLabel: String {
+        switch self {
+        case .singleClick: return "Click"
+        case .doubleClick: return "Double-Click"
+        case .rightClick: return "Right-Click"
+        }
+    }
 }
 
 enum TrackpadGestureType: String, Codable, CaseIterable {
@@ -56,6 +64,13 @@ enum TrackpadGestureType: String, Codable, CaseIterable {
         switch self {
         case .forceClick: return "Force Click"
         case .twoFingerTap: return "Two Finger Tap"
+        }
+    }
+
+    var chipLabel: String {
+        switch self {
+        case .forceClick: return "Force Click"
+        case .twoFingerTap: return "2-Finger Tap"
         }
     }
 }

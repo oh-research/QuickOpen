@@ -20,6 +20,11 @@ final class EventMonitorService {
     /// Called when the event tap detects that accessibility permission was lost.
     var onPermissionLost: (() -> Void)?
 
+    /// Returns true if a double-click mapping exists for the given modifier set.
+    /// When false, single-click triggers fire immediately instead of waiting
+    /// `doubleClickInterval` to disambiguate — the main source of perceived launch latency.
+    var hasDoubleClickMapping: ((Set<ModifierKey>) -> Bool)?
+
     /// Tracks double-click timing
     private var lastClickTime: TimeInterval = 0
     private var lastClickLocation: CGPoint = .zero
@@ -220,9 +225,19 @@ final class EventMonitorService {
             stateLock.lock()
             let timeDelta = now - lastClickTime
             let distance = hypot(location.x - lastClickLocation.x, location.y - lastClickLocation.y)
+            let priorModifiers = lastClickModifiers
             stateLock.unlock()
 
-            if timeDelta < Self.doubleClickInterval && distance < Self.doubleClickRadius {
+            // A second click only counts as a double-click when the FIRST click
+            // carried the same modifiers. Without this guard, a plain click
+            // followed quickly by a modifier click pairs into a phantom
+            // "empty-modifier double-click", which matches no mapping and is
+            // silently suppressed — the user perceives it as a missed trigger.
+            let isDoubleClick = timeDelta < Self.doubleClickInterval
+                && distance < Self.doubleClickRadius
+                && priorModifiers == modifiers
+
+            if isDoubleClick {
                 // Second click within interval: cancel pending single-click and fire double-click.
                 // Fix 1: Use the modifiers captured during the FIRST click, not the current ones.
                 stateLock.lock()
@@ -241,15 +256,28 @@ final class EventMonitorService {
                 fireTrigger(trigger)
                 return nil // suppress the event
             } else {
-                // First click with modifiers: record time/location/modifiers, pass event through,
-                // and schedule a deferred single-click trigger.
+                // First click with modifiers. If no double-click mapping exists for
+                // these modifiers, fire immediately — the 500ms deferral only exists
+                // to disambiguate single vs double.
+                let singleClickTrigger = TriggerType.mouseClick(modifiers: modifiers, clickType: .singleClick)
+                let needsDeferral = hasDoubleClickMapping?(modifiers) ?? true
+
+                if !needsDeferral {
+                    stateLock.lock()
+                    lastClickTime = 0
+                    lastClickLocation = .zero
+                    lastClickModifiers = []
+                    stateLock.unlock()
+
+                    fireTrigger(singleClickTrigger)
+                    return Unmanaged.passRetained(event)
+                }
+
                 stateLock.lock()
                 lastClickTime = now
                 lastClickLocation = location
                 lastClickModifiers = modifiers  // Fix 1: snapshot modifiers for the double-click branch
                 stateLock.unlock()
-
-                let singleClickTrigger = TriggerType.mouseClick(modifiers: modifiers, clickType: .singleClick)
 
                 let workItem = DispatchWorkItem { [weak self] in
                     guard let self else { return }

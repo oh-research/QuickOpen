@@ -67,8 +67,18 @@ final class AppCoordinator {
                 }
             }
         } else {
-            Self.logger.warning("Accessibility permission revoked — stopping event monitor")
+            Self.logger.warning("Accessibility permission revoked — stopping event monitor and shortcuts")
             eventMonitorService.stop()
+            // Keyboard shortcuts don't require accessibility at registration time,
+            // but without it the user has lost mouse/trackpad triggers and likely
+            // expects the whole app to stop responding consistently.
+            shortcutService.unregisterAll()
+            triggersConfigured = false
+            // Bring the setup window back so the user has a recovery path instead
+            // of a menubar icon that silently does nothing.
+            if state.setupCompleted {
+                state.showSetupWindow = true
+            }
         }
     }
 
@@ -103,6 +113,12 @@ final class AppCoordinator {
             completion()
         }
 
+        eventMonitorService.hasDoubleClickMapping = { [weak self] modifiers in
+            guard let self else { return false }
+            let target = TriggerType.mouseClick(modifiers: modifiers, clickType: .doubleClick)
+            return self.configManager.mappings.contains { $0.isEnabled && $0.trigger == target }
+        }
+
         eventMonitorService.onPermissionLost = { [weak self] in
             guard let self else { return }
             self.permissionManager.checkPermissions(includeAutomation: false)
@@ -110,6 +126,25 @@ final class AppCoordinator {
 
         if permissionManager.accessibilityGranted {
             eventMonitorService.start()
+        }
+
+        warmUpLaunchPath()
+    }
+
+    /// Pre-warms the launch path so the first trigger doesn't pay cold-start
+    /// costs: (1) LaunchServices lookup for mapped bundle IDs, (2) Finder
+    /// AppleEvent bridge + script compilation.
+    private func warmUpLaunchPath() {
+        let bundleIDs = Set(
+            configManager.mappings
+                .filter(\.isEnabled)
+                .map(\.targetAppBundleID)
+        )
+        Task.detached(priority: .utility) {
+            for bundleID in bundleIDs {
+                _ = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+            }
+            await FinderService.warmUp()
         }
     }
 
@@ -127,7 +162,7 @@ final class AppCoordinator {
             return
         }
 
-        Self.logger.info("Executing mapping: \(mapping.name)")
+        Self.logger.info("Executing mapping: \(mapping.name, privacy: .private)")
         Task {
             await ActionExecutor.execute(mapping: mapping)
         }

@@ -22,7 +22,7 @@ struct QuickOpenApp: App {
             MenuBarView()
                 .environment(coordinator)
         } label: {
-            menuBarImage
+            Image(nsImage: MenuBarIcon.make())
                 .onAppear {
                     if coordinator.state.showSetupWindow {
                         coordinator.state.showSetupWindow = false
@@ -32,10 +32,16 @@ struct QuickOpenApp: App {
                 }
         }
 
-        Settings {
+        // The SwiftUI Settings scene ignores .windowResizability modifiers and
+        // always produces a fixed-size window. A regular Window scene honors
+        // .contentMinSize, so the user can drag the edges to resize.
+        Window("QuickOpen Settings", id: "settings") {
             SettingsView()
                 .environment(coordinator)
         }
+        .windowResizability(.contentMinSize)
+        .windowStyle(.titleBar)
+        .defaultPosition(.center)
 
         Window("QuickOpen Setup", id: "setup") {
             SetupWindowContent(coordinator: coordinator)
@@ -50,13 +56,6 @@ struct QuickOpenApp: App {
         .windowResizability(.contentSize)
         .windowStyle(.titleBar)
         .defaultPosition(.center)
-    }
-
-    private var menuBarImage: Image {
-        if !coordinator.permissionManager.allPermissionsGranted {
-            return Image(systemName: "exclamationmark.circle")
-        }
-        return Image(nsImage: MenuBarIcon.make())
     }
 }
 

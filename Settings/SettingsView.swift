@@ -4,18 +4,15 @@ struct SettingsView: View {
     @Environment(AppCoordinator.self) private var coordinator
 
     var body: some View {
-        TabView {
+        VStack(spacing: 0) {
             MappingListView()
-                .tabItem {
-                    Label("Triggers", systemImage: "bolt.fill")
-                }
-
+            Divider()
             GeneralSettingsView()
-                .tabItem {
-                    Label("General", systemImage: "gear")
-                }
         }
-        .frame(minWidth: 400, minHeight: 400)
+        .frame(
+            minWidth: 280, idealWidth: 435, maxWidth: .infinity,
+            minHeight: 300, idealHeight: 332, maxHeight: .infinity
+        )
         .environment(coordinator)
     }
 }

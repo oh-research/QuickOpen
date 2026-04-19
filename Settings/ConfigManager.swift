@@ -30,7 +30,17 @@ final class ConfigManager {
         let quickOpenDir = appSupport.appendingPathComponent("QuickOpen", isDirectory: true)
 
         if !FileManager.default.fileExists(atPath: quickOpenDir.path) {
-            try? FileManager.default.createDirectory(at: quickOpenDir, withIntermediateDirectories: true)
+            try? FileManager.default.createDirectory(
+                at: quickOpenDir,
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: 0o700]
+            )
+        } else {
+            // Tighten perms on directories created by older builds (0o755 default).
+            try? FileManager.default.setAttributes(
+                [.posixPermissions: 0o700],
+                ofItemAtPath: quickOpenDir.path
+            )
         }
 
         self.configURL = quickOpenDir.appendingPathComponent("config.json")
@@ -46,6 +56,12 @@ final class ConfigManager {
             Self.logger.info("No config file found, using defaults")
             return
         }
+
+        // Tighten perms on files written by older builds before we trust the contents.
+        try? FileManager.default.setAttributes(
+            [.posixPermissions: 0o600],
+            ofItemAtPath: configURL.path
+        )
 
         do {
             let data = try Data(contentsOf: configURL)
@@ -75,6 +91,12 @@ final class ConfigManager {
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             let data = try encoder.encode(config)
             try data.write(to: configURL, options: .atomic)
+            // The config contains user-defined bundle IDs that drive app launches;
+            // other local processes must not be able to tamper with them.
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o600],
+                ofItemAtPath: configURL.path
+            )
             Self.logger.info("Saved \(self.config.mappings.count) mappings")
         } catch {
             Self.logger.error("Failed to save config: \(error.localizedDescription)")

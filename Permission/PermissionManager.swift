@@ -79,6 +79,30 @@ final class PermissionManager {
         }
     }
 
+    /// Triggers the system-native Accessibility permission alert.
+    /// On first ask macOS shows an inline prompt and adds QuickOpen to the
+    /// Accessibility list automatically — the user no longer has to hit "+"
+    /// and browse for the app. Subsequent calls after a previous Deny do
+    /// nothing; `openAccessibilitySettings()` remains available as fallback.
+    func requestAccessibilityPermission() {
+        let options = [
+            kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
+        ] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
+    }
+
+    /// Fires a cheap AppleEvent at Finder to surface the native Automation
+    /// alert ("QuickOpen wants to control Finder"). On first invocation the
+    /// user sees a standard TCC prompt; after a Deny the caller should use
+    /// `openAutomationSettings()` as fallback.
+    func requestAutomationPermission() {
+        DispatchQueue.global(qos: .userInitiated).async {
+            let script = NSAppleScript(source: "tell application \"Finder\" to return name")
+            var error: NSDictionary?
+            script?.executeAndReturnError(&error)
+        }
+    }
+
     private func checkAutomationPermission() async -> Bool {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {

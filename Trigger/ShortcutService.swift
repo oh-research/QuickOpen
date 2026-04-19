@@ -24,15 +24,19 @@ final class ShortcutService {
         let keyCode: UInt32
         let modifiers: UInt32
 
-        var displayString: String {
+        /// Individual display tokens: modifier symbols followed by the key name.
+        /// Used by UI code that renders each token as its own keycap chip.
+        var chips: [String] {
             var parts: [String] = []
             if modifiers & UInt32(controlKey) != 0 { parts.append("\u{2303}") }
             if modifiers & UInt32(optionKey) != 0 { parts.append("\u{2325}") }
             if modifiers & UInt32(shiftKey) != 0 { parts.append("\u{21E7}") }
             if modifiers & UInt32(cmdKey) != 0 { parts.append("\u{2318}") }
             parts.append(keyCodeToString(keyCode))
-            return parts.joined()
+            return parts
         }
+
+        var displayString: String { chips.joined() }
     }
 
     init() {

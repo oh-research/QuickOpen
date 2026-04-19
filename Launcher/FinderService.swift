@@ -32,26 +32,74 @@ final class FinderService {
     private static let logger = Logger(subsystem: "com.ohresearch.QuickOpen", category: "FinderService")
     private static let finderBundleID = "com.apple.finder"
 
+    // NSAppleScript is not thread-safe — every execution goes through this serial queue.
+    private static let scriptQueue = DispatchQueue(
+        label: "com.ohresearch.QuickOpen.FinderService.AppleScript",
+        qos: .userInitiated
+    )
+
+    private static let selectedItemsSource = """
+    tell application "Finder"
+        set selectedItems to selection
+        if (count of selectedItems) is 0 then
+            return ""
+        end if
+        set pathList to ""
+        repeat with anItem in selectedItems
+            set pathList to pathList & (POSIX path of (anItem as alias)) & linefeed
+        end repeat
+        return pathList
+    end tell
+    """
+
+    private static let currentDirectorySource = """
+    tell application "Finder"
+        if (count of Finder windows) is 0 then
+            return POSIX path of (desktop as alias)
+        end if
+        return POSIX path of (target of front Finder window as alias)
+    end tell
+    """
+
+    // Pre-built NSAppleScript instances. Compiled lazily on first execute
+    // (or explicitly via `warmUp`). Retained for the app's lifetime so
+    // subsequent invocations skip the 50–150ms compile step.
+    private static let selectedItemsScript = NSAppleScript(source: selectedItemsSource)
+    private static let currentDirectoryScript = NSAppleScript(source: currentDirectorySource)
+
     static var isFinderFrontmost: Bool {
         NSWorkspace.shared.frontmostApplication?.bundleIdentifier == finderBundleID
     }
 
+    /// Pre-compiles AppleScripts and warms the Finder AppleEvent bridge
+    /// (Mach port + TCC automation cache). Safe to call from a background task.
+    /// Requires Automation permission to be granted; failure is logged and ignored.
+    static func warmUp() async {
+        await withCheckedContinuation { continuation in
+            scriptQueue.async {
+                selectedItemsScript?.compileAndReturnError(nil)
+                currentDirectoryScript?.compileAndReturnError(nil)
+
+                // Trivial AppleEvent establishes the Mach port + TCC cache.
+                if let bootstrap = NSAppleScript(source: "tell application \"Finder\" to return name") {
+                    var error: NSDictionary?
+                    bootstrap.executeAndReturnError(&error)
+                    if let error {
+                        logger.debug("Finder warmUp returned error: \(error)")
+                    } else {
+                        logger.info("Finder AppleEvent bridge warmed up")
+                    }
+                }
+                continuation.resume()
+            }
+        }
+    }
+
     /// Returns URLs of currently selected items in Finder via AppleScript.
     static func getSelectedItems() async -> Result<[URL], FinderError> {
-        let script = """
-        tell application "Finder"
-            set selectedItems to selection
-            if (count of selectedItems) is 0 then
-                return ""
-            end if
-            set pathList to ""
-            repeat with anItem in selectedItems
-                set pathList to pathList & (POSIX path of (anItem as alias)) & linefeed
-            end repeat
-            return pathList
-        end tell
-        """
-
+        guard let script = selectedItemsScript else {
+            return .failure(.unknown("Failed to create AppleScript"))
+        }
         let result = await runAppleScript(script)
         switch result {
         case .success(let urls):
@@ -66,15 +114,9 @@ final class FinderService {
 
     /// Returns the URL of the current Finder window's directory.
     static func getCurrentDirectory() async -> Result<URL, FinderError> {
-        let script = """
-        tell application "Finder"
-            if (count of Finder windows) is 0 then
-                return POSIX path of (desktop as alias)
-            end if
-            return POSIX path of (target of front Finder window as alias)
-        end tell
-        """
-
+        guard let script = currentDirectoryScript else {
+            return .failure(.unknown("Failed to create AppleScript"))
+        }
         let result = await runAppleScript(script)
         switch result {
         case .success(let urls):
@@ -90,21 +132,17 @@ final class FinderService {
         }
     }
 
-    private static func runAppleScript(_ source: String) async -> Result<[URL], FinderError> {
+    private static func runAppleScript(_ script: NSAppleScript) async -> Result<[URL], FinderError> {
         do {
             return try await withThrowingTaskGroup(of: Result<[URL], FinderError>.self) { group in
-                // Task 1: run the AppleScript on a background thread.
+                // Task 1: run the AppleScript on the serial script queue.
+                // Using the same instance + serial queue preserves the compiled
+                // state between calls and keeps NSAppleScript thread-safe.
                 group.addTask {
                     await withCheckedContinuation { continuation in
-                        DispatchQueue.global(qos: .userInitiated).async {
+                        scriptQueue.async {
                             var error: NSDictionary?
-                            guard let appleScript = NSAppleScript(source: source) else {
-                                logger.error("Failed to create AppleScript")
-                                continuation.resume(returning: .failure(.unknown("Failed to create AppleScript object")))
-                                return
-                            }
-
-                            let result = appleScript.executeAndReturnError(&error)
+                            let result = script.executeAndReturnError(&error)
 
                             if let error = error {
                                 logger.error("AppleScript error: \(error)")

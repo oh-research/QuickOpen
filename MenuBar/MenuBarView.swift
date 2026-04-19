@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct MenuBarView: View {
@@ -12,17 +13,17 @@ struct MenuBarView: View {
 
         Divider()
 
-        SettingsLink {
-            Text("Settings...")
+        Button("Settings...") {
+            openAndActivateWindow(id: "settings")
         }
         .keyboardShortcut(",")
 
         Button("How to Use...") {
-            openWindow(id: "setup")
+            openAndActivateWindow(id: "setup")
         }
 
         Button("About QuickOpen") {
-            openWindow(id: "about")
+            openAndActivateWindow(id: "about")
         }
 
         Divider()
@@ -31,5 +32,12 @@ struct MenuBarView: View {
             NSApplication.shared.terminate(nil)
         }
         .keyboardShortcut("q")
+    }
+
+    /// LSUIElement apps don't get foreground focus just by opening a window.
+    /// Activating AFTER openWindow ensures the window reaches the front.
+    private func openAndActivateWindow(id: String) {
+        openWindow(id: id)
+        NSApp.activate()
     }
 }
